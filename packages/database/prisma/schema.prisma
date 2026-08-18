@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConversationType {
+  general
+  follow_up
+  medication_review
+  symptom_check
+  care_plan
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+  tool
+}
+
+enum MessageStatus {
+  draft
+  sending
+  streaming
+  sent
+  delivered
+  read
+  failed
+}
+
+enum AttachmentType {
+  document
+  image
+  audio
+  video
+  other
+}
+
+enum MemoryScope {
+  conversation
+  user
+  workspace
+}
+
+enum MemoryType {
+  fact
+  preference
+  summary
+  safety_note
+}
+
+enum EmergencyLevel {
+  low
+  moderate
+  high
+  critical
+}
+
+enum RiskLevel {
+  minimal
+  mild
+  moderate
+  elevated
+  severe
+}
+
+enum Theme {
+  light
+  dark
+  system
+}
+
+enum SupportedLanguage {
+  en_US
+  en_GB
+  es_ES
+  fr_FR
+  de_DE
+  it_IT
+  pt_BR
+  hi_IN
+  ja_JP
+  ko_KR
+  zh_CN
+  ar_SA
+}
+
+enum DiseaseCategory {
+  infectious
+  cardiovascular
+  respiratory
+  endocrine
+  neurological
+  musculoskeletal
+  gastrointestinal
+  dermatological
+  mental_health
+  other
+}
+
+enum BodySystem {
+  cardiovascular
+  respiratory
+  digestive
+  nervous
+  endocrine
+  musculoskeletal
+  immune
+  integumentary
+  urinary
+  reproductive
+}
+
+model User {
+  id          String         @id @default(uuid()) @db.Uuid
+  displayName String         @db.VarChar(200)
+  email       String?        @unique @db.VarChar(320)
+  avatarUrl   String?
+  preferences Json
+  metadata    Json?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  conversations   Conversation[]
+  medicalProfile   MedicalProfile?
+  memories         Memory[]
+  settings         UserSettings?
+  feedbacks        Feedback[]
+  attachments      Attachment[]
+
+  @@index([deletedAt])
+  @@index([email, deletedAt])
+}
+
+model Conversation {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  title          String          @db.VarChar(200)
+  type           ConversationType @default(general)
+  summary        Json?
+  messageIds     Json            @default("[]")
+  participantIds Json            @default("[]")
+  preferences    Json
+  metadata       Json?
+  archivedAt     DateTime?
+  deletedAt      DateTime?
+  pinnedAt       DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  attachments Attachment[]
+  feedbacks   Feedback[]
+
+  @@index([userId, deletedAt])
+  @@index([type, deletedAt])
+  @@index([archivedAt])
+}
+
+model Message {
+  id            String        @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  role          MessageRole
+  status        MessageStatus @default(sent)
+  content       String        @db.Text
+  metadata      Json?
+  editedAt      DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  conversation Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  Attachment[]
+  feedbacks    Feedback[]
+
+  @@index([conversationId, deletedAt])
+  @@index([role, deletedAt])
+}
+
+model MedicalProfile {
+  id               String         @id @default(uuid()) @db.Uuid
+  userId           String         @unique @db.Uuid
+  emergencyLevel   EmergencyLevel
+  bodySystems      Json
+  diseaseCategories Json
+  symptoms         Json
+  medicines        Json
+  allergies        Json
+  vitalSigns       Json
+  healthMetrics    Json
+  disclaimers      Json
+  metadata         Json?
+  deletedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deletedAt])
+}
+
+model Memory {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String?      @db.Uuid
+  conversationId String?      @db.Uuid
+  scope         MemoryScope
+  type          MemoryType
+  content       String       @db.Text
+  sourceId      String?      @db.Uuid
+  metadata      Json?
+  deletedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, deletedAt])
+  @@index([conversationId, deletedAt])
+  @@index([scope, type])
+}
+
+model UserSettings {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  chat        Json
+  privacy     Json
+  security    Json
+  appearance  Json
+  metadata    Json?
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deletedAt])
+}
+
+model Feedback {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String?   @db.Uuid
+  conversationId String?  @db.Uuid
+  messageId     String?   @db.Uuid
+  rating        Int?
+  comment       String?   @db.Text
+  metadata      Json?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message      Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([userId, deletedAt])
+  @@index([conversationId, deletedAt])
+  @@index([messageId, deletedAt])
+}
+
+model Attachment {
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String?       @db.Uuid
+  conversationId String       @db.Uuid
+  messageId     String?       @db.Uuid
+  type          AttachmentType
+  name          String        @db.VarChar(255)
+  mimeType      String        @db.VarChar(255)
+  sizeBytes     Int
+  storageKey    String?
+  url           String?
+  metadata      Json?
+  deletedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, deletedAt])
+  @@index([messageId, deletedAt])
+  @@index([userId, deletedAt])
+}
