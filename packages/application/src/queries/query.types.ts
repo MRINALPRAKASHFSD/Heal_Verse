@@ -1,0 +1,9 @@
+export type RetrieveConversationQuery = import('../dto').RetrieveConversationRequestDto;
+export type RetrieveMemoryQuery = import('../dto').RetrieveMemoryRequestDto;
+export type DetectLanguageQuery = import('../dto').DetectLanguageRequestDto;
+export type TranslateMessageQuery = import('../dto').TranslateMessageRequestDto;
+export type DetectEmergencyQuery = import('../dto').DetectEmergencyRequestDto;
+export type GenerateMedicalResponseQuery = import('../dto').GenerateMedicalResponseRequestDto;
+export type GenerateFollowUpQuestionsQuery = import('../dto').GenerateFollowUpQuestionsRequestDto;
+export type AnalyzeSymptomsQuery = import('../dto').AnalyzeSymptomsRequestDto;
+export type SummarizeConversationQuery = import('../dto').SummarizeConversationRequestDto;
