@@ -1,0 +1,35 @@
+{
+  "name": "@healverse/web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "framer-motion": "latest",
+    "next": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zustand": "latest",
+    "zod": "latest",
+    "@healverse/application": "workspace:*",
+    "@healverse/database": "workspace:*",
+    "@healverse/infrastructure": "workspace:*",
+    "@healverse/shared": "workspace:*",
+    "@healverse/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "autoprefixer": "latest",
+    "postcss": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest"
+  }
+}
