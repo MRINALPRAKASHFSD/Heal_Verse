@@ -13,20 +13,19 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
     "paths": {
-      "@/app/*": ["apps/web/app/*"],
-      "@/components/*": ["apps/web/components/*"],
-      "@/features/*": ["apps/web/features/*"],
-      "@/hooks/*": ["apps/web/hooks/*"],
-      "@/lib/*": ["apps/web/lib/*"],
-      "@/providers/*": ["apps/web/providers/*"],
-      "@/styles/*": ["apps/web/styles/*"],
-      "@healverse/ai": ["packages/ai/src/index.ts"],
-      "@healverse/database": ["packages/database/src/index.ts"],
-      "@healverse/shared": ["packages/shared/src/index.ts"],
-       "@healverse/infrastructure": ["packages/infrastructure/src/index.ts"],
-      "@healverse/ui": ["packages/ui/src/index.ts"]
+      "@/app/*": ["./apps/web/app/*"],
+      "@/components/*": ["./apps/web/components/*"],
+      "@/features/*": ["./apps/web/features/*"],
+      "@/hooks/*": ["./apps/web/hooks/*"],
+      "@/lib/*": ["./apps/web/lib/*"],
+      "@/providers/*": ["./apps/web/providers/*"],
+      "@/styles/*": ["./apps/web/styles/*"],
+      "@healverse/ai": ["./packages/ai/src/index.ts"],
+      "@healverse/database": ["./packages/database/src/index.ts"],
+      "@healverse/shared": ["./packages/shared/src/index.ts"],
+      "@healverse/infrastructure": ["./packages/infrastructure/src/index.ts"],
+      "@healverse/ui": ["./packages/ui/src/index.ts"]
     }
   }
 }
