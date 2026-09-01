@@ -3,7 +3,7 @@ import { ConversationType, MessageRole, MessageStatus, AttachmentType } from '..
 import type { SupportedLanguage } from '../../enums/language.enums';
 import type { Theme } from '../../enums/theme.enums';
 
-export type { ConversationType, MessageRole, MessageStatus };
+export { ConversationType, MessageRole, MessageStatus };
 
 export interface Attachment {
   readonly id: UUID;

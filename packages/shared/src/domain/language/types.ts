@@ -1,7 +1,7 @@
 import type { ISODateString, UUID } from '../../types';
 import { Locale, SupportedLanguage } from '../../enums/language.enums';
 
-export type { SupportedLanguage, Locale };
+export { SupportedLanguage, Locale };
 
 export interface DetectedLanguage {
   readonly id: UUID;

@@ -3,7 +3,7 @@ import { SupportedLanguage } from '../../enums/language.enums';
 import { Theme } from '../../enums/theme.enums';
 import { NotificationChannel, NotificationPriority } from '../../enums/notification.enums';
 
-export type { Theme };
+export { Theme };
 
 export interface LanguagePreference {
   readonly primary: SupportedLanguage;
