@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ConversationType, MessageRole, MessageStatus, AttachmentType } from '../../enums/chat.enums';
-import { supportedLanguageSchema, themeSchema, isoDateStringSchema, nonEmptyStringSchema, positiveIntegerSchema, uuidSchema } from '../../schemas/common.schemas';
+import { supportedLanguageSchema, themeSchema, isoDateStringSchema, nonEmptyStringSchema, positiveIntegerSchema, nonNegativeIntegerSchema, uuidSchema } from '../../schemas/common.schemas';
 
 export const conversationTypeSchema = z.nativeEnum(ConversationType);
 export const messageRoleSchema = z.nativeEnum(MessageRole);
@@ -42,7 +42,7 @@ export const conversationSummarySchema = z.object({
   title: nonEmptyStringSchema,
   type: conversationTypeSchema,
   lastMessagePreview: nonEmptyStringSchema,
-  messageCount: positiveIntegerSchema,
+  messageCount: nonNegativeIntegerSchema,
   updatedAt: isoDateStringSchema,
 });
 

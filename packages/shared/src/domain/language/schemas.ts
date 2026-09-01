@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import { Locale, SupportedLanguage } from '../../enums/language.enums';
-import { isoDateStringSchema, percentageSchema, uuidSchema } from '../../schemas/common.schemas';
+import { isoDateStringSchema, percentageSchema, uuidSchema, supportedLanguageSchema, localeSchema } from '../../schemas/common.schemas';
 
-export const supportedLanguageSchema = z.nativeEnum(SupportedLanguage);
-export const localeSchema = z.nativeEnum(Locale);
+export { supportedLanguageSchema, localeSchema };
 
 export const detectedLanguageSchema = z.object({
   id: uuidSchema,
