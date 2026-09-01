@@ -18,5 +18,5 @@ export function normalizeLanguage(value: string | null | undefined): SupportedLa
 }
 
 export function toLocale(language: SupportedLanguage): Locale {
-  return language as Locale;
+  return (language as unknown) as Locale;
 }

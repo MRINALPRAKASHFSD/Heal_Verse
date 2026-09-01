@@ -1,8 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import type { UUID } from '../types';
 
 export function createUuid(): UUID {
-  return randomUUID() as UUID;
+  return crypto.randomUUID() as UUID;
 }
 
 export function isUuid(value: string): boolean {
