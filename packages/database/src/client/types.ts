@@ -8,8 +8,11 @@ export type PrismaJsonValue =
 
 export interface PrismaUserRecord {
   id: string;
+  name?: string | null;
   displayName: string;
   email: string | null;
+  emailVerified?: boolean;
+  image?: string | null;
   avatarUrl: string | null;
   preferences: PrismaJsonValue;
   metadata: PrismaJsonValue | null;
@@ -123,6 +126,42 @@ export interface PrismaAttachmentRecord {
   updatedAt: Date;
 }
 
+export interface PrismaSessionRecord {
+  id: string;
+  expiresAt: Date;
+  token: string;
+  createdAt: Date;
+  updatedAt: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
+  userId: string;
+}
+
+export interface PrismaAccountRecord {
+  id: string;
+  accountId: string;
+  providerId: string;
+  userId: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  idToken: string | null;
+  accessTokenExpiresAt: Date | null;
+  refreshTokenExpiresAt: Date | null;
+  scope: string | null;
+  password: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PrismaVerificationRecord {
+  id: string;
+  identifier: string;
+  value: string;
+  expiresAt: Date;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
 export interface PrismaDelegate<TRecord extends { id: string }> {
   create(args: { data: Record<string, unknown> }): Promise<TRecord>;
   update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<TRecord>;
@@ -135,6 +174,9 @@ export interface PrismaDelegate<TRecord extends { id: string }> {
 
 export interface PrismaDatabaseClient {
   user: PrismaDelegate<PrismaUserRecord>;
+  session: PrismaDelegate<PrismaSessionRecord>;
+  account: PrismaDelegate<PrismaAccountRecord>;
+  verification: PrismaDelegate<PrismaVerificationRecord>;
   conversation: PrismaDelegate<PrismaConversationRecord>;
   message: PrismaDelegate<PrismaMessageRecord>;
   medicalProfile: PrismaDelegate<PrismaMedicalProfileRecord>;
@@ -144,5 +186,5 @@ export interface PrismaDatabaseClient {
   attachment: PrismaDelegate<PrismaAttachmentRecord>;
   $connect(): Promise<void>;
   $disconnect(): Promise<void>;
-  $transaction<T>(operations: Promise<T>[]): Promise<T[]>;
+  $transaction(operations: unknown[]): Promise<unknown[]>;
 }
