@@ -116,47 +116,97 @@ enum BodySystem {
 }
 
 model User {
-  id          String         @id @default(uuid()) @db.Uuid
-  displayName String         @db.VarChar(200)
-  email       String?        @unique @db.VarChar(320)
-  avatarUrl   String?
-  preferences Json
-  metadata    Json?
-  deletedAt   DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String?   @db.VarChar(200)
+  displayName   String    @db.VarChar(200)
+  email         String?   @unique @db.VarChar(320)
+  emailVerified Boolean   @default(false)
+  image         String?
+  avatarUrl     String?
+  preferences   Json      @default("{\"theme\":\"system\",\"language\":\"en-US\",\"sendWithEnter\":true,\"compactMode\":false,\"allowAttachments\":true}")
+  metadata      Json?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  conversations   Conversation[]
-  medicalProfile   MedicalProfile?
-  memories         Memory[]
-  settings         UserSettings?
-  feedbacks        Feedback[]
-  attachments      Attachment[]
+  sessions       Session[]
+  accounts       Account[]
+  conversations  Conversation[]
+  medicalProfile MedicalProfile?
+  memories       Memory[]
+  settings       UserSettings?
+  feedbacks      Feedback[]
+  attachments    Attachment[]
 
   @@index([deletedAt])
   @@index([email, deletedAt])
 }
 
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String    @db.Uuid
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  @@index([identifier])
+}
+
 model Conversation {
-  id             String          @id @default(uuid()) @db.Uuid
-  userId         String          @db.Uuid
-  title          String          @db.VarChar(200)
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid
+  title          String           @db.VarChar(200)
   type           ConversationType @default(general)
   summary        Json?
-  messageIds     Json            @default("[]")
-  participantIds Json            @default("[]")
+  messageIds     Json             @default("[]")
+  participantIds Json             @default("[]")
   preferences    Json
   metadata       Json?
   archivedAt     DateTime?
   deletedAt      DateTime?
   pinnedAt       DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages    Message[]
   attachments Attachment[]
   feedbacks   Feedback[]
+  memories    Memory[]
 
   @@index([userId, deletedAt])
   @@index([type, deletedAt])
@@ -164,18 +214,18 @@ model Conversation {
 }
 
 model Message {
-  id            String        @id @default(uuid()) @db.Uuid
-  conversationId String       @db.Uuid
-  role          MessageRole
-  status        MessageStatus @default(sent)
-  content       String        @db.Text
-  metadata      Json?
-  editedAt      DateTime?
-  deletedAt     DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String        @id @default(uuid()) @db.Uuid
+  conversationId String        @db.Uuid
+  role           MessageRole
+  status         MessageStatus @default(sent)
+  content        String        @db.Text
+  metadata       Json?
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  conversation Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   attachments  Attachment[]
   feedbacks    Feedback[]
 
@@ -184,21 +234,21 @@ model Message {
 }
 
 model MedicalProfile {
-  id               String         @id @default(uuid()) @db.Uuid
-  userId           String         @unique @db.Uuid
-  emergencyLevel   EmergencyLevel
-  bodySystems      Json
+  id                String         @id @default(uuid()) @db.Uuid
+  userId            String         @unique @db.Uuid
+  emergencyLevel    EmergencyLevel
+  bodySystems       Json
   diseaseCategories Json
-  symptoms         Json
-  medicines        Json
-  allergies        Json
-  vitalSigns       Json
-  healthMetrics    Json
-  disclaimers      Json
-  metadata         Json?
-  deletedAt        DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  symptoms          Json
+  medicines         Json
+  allergies         Json
+  vitalSigns        Json
+  healthMetrics     Json
+  disclaimers       Json
+  metadata          Json?
+  deletedAt         DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -206,19 +256,19 @@ model MedicalProfile {
 }
 
 model Memory {
-  id            String       @id @default(uuid()) @db.Uuid
-  userId        String?      @db.Uuid
-  conversationId String?      @db.Uuid
-  scope         MemoryScope
-  type          MemoryType
-  content       String       @db.Text
-  sourceId      String?      @db.Uuid
-  metadata      Json?
-  deletedAt     DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id             String      @id @default(uuid()) @db.Uuid
+  userId         String?     @db.Uuid
+  conversationId String?     @db.Uuid
+  scope          MemoryScope
+  type           MemoryType
+  content        String      @db.Text
+  sourceId       String?     @db.Uuid
+  metadata       Json?
+  deletedAt      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([userId, deletedAt])
@@ -227,16 +277,16 @@ model Memory {
 }
 
 model UserSettings {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @unique @db.Uuid
-  chat        Json
-  privacy     Json
-  security    Json
-  appearance  Json
-  metadata    Json?
-  deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @unique @db.Uuid
+  chat       Json
+  privacy    Json
+  security   Json
+  appearance Json
+  metadata   Json?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -244,16 +294,16 @@ model UserSettings {
 }
 
 model Feedback {
-  id            String    @id @default(uuid()) @db.Uuid
-  userId        String?   @db.Uuid
-  conversationId String?  @db.Uuid
-  messageId     String?   @db.Uuid
-  rating        Int?
-  comment       String?   @db.Text
-  metadata      Json?
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String?   @db.Uuid
+  conversationId String?   @db.Uuid
+  messageId      String?   @db.Uuid
+  rating         Int?
+  comment        String?   @db.Text
+  metadata       Json?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
@@ -265,24 +315,24 @@ model Feedback {
 }
 
 model Attachment {
-  id            String        @id @default(uuid()) @db.Uuid
-  userId        String?       @db.Uuid
-  conversationId String       @db.Uuid
-  messageId     String?       @db.Uuid
-  type          AttachmentType
-  name          String        @db.VarChar(255)
-  mimeType      String        @db.VarChar(255)
-  sizeBytes     Int
-  storageKey    String?
-  url           String?
-  metadata      Json?
-  deletedAt     DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String?        @db.Uuid
+  conversationId String         @db.Uuid
+  messageId      String?        @db.Uuid
+  type           AttachmentType
+  name           String         @db.VarChar(255)
+  mimeType       String         @db.VarChar(255)
+  sizeBytes      Int
+  storageKey     String?
+  url            String?
+  metadata       Json?
+  deletedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  message      Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      Message?     @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, deletedAt])
   @@index([messageId, deletedAt])
