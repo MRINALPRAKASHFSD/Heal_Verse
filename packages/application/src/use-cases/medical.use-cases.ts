@@ -16,4 +16,4 @@ export interface DetectEmergencyUseCase extends Query<DetectEmergencyRequestDto,
 export interface GenerateMedicalResponseUseCase extends Command<GenerateMedicalResponseRequestDto, GenerateMedicalResponseResponseDto> {}
 export interface GenerateFollowUpQuestionsUseCase extends Query<GenerateFollowUpQuestionsRequestDto, GenerateFollowUpQuestionsResponseDto> {}
 export interface AnalyzeSymptomsUseCase extends Query<AnalyzeSymptomsRequestDto, AnalyzeSymptomsResponseDto> {}
-export interface SummarizeConversationUseCase extends Query<SummarizeConversationRequestDto, SummarizeConversationResponseDto> {}
+export interface SummarizeMedicalConversationUseCase extends Query<SummarizeConversationRequestDto, SummarizeConversationResponseDto> {}

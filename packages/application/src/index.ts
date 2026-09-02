@@ -10,3 +10,13 @@ export * from './ports';
 export * from './queries';
 export * from './services';
 export * from './use-cases';
+export type {
+  Conversation,
+  ConversationSummary,
+  MedicalProfile,
+  MemoryItem,
+  Message,
+  Settings,
+  User,
+  UUID,
+} from '@healverse/shared';
