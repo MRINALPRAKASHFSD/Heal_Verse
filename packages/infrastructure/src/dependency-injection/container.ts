@@ -82,7 +82,7 @@ export function createInfrastructureContainer(config?: Partial<InfrastructureCon
 
   const embeddingProvider = new OpenAIEmbeddingProvider(infrastructureConfig.embeddingProviders[0] ?? { name: 'openai-embedding' }, infrastructureConfig, logger);
 
-  const authAdapter = new BetterAuthAdapter({ config: infrastructureConfig, logger });
+  const authAdapter = new BetterAuthAdapter({ config: infrastructureConfig, logger, db });
   const databaseAdapter = new PrismaAdapter({ config: infrastructureConfig, logger });
 
   return {
