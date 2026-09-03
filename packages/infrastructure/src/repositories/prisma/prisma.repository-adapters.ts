@@ -6,10 +6,10 @@ import type {
   BodySystem,
   ChatPreferences,
   ConversationSummary,
-  ConversationType,
   DiseaseCategory,
   EmergencyLevel,
   HealthMetric,
+  ISODateString,
   MedicalDisclaimer,
   MessageRole,
   MessageStatus,
@@ -17,6 +17,7 @@ import type {
   MemoryType,
   VitalSigns,
 } from '@healverse/shared';
+import { ConversationType } from '@healverse/shared';
 import { BaseAdapter } from '../../adapters/base.adapter';
 import type { InfrastructureConfig } from '../../config';
 import type {
@@ -42,19 +43,23 @@ abstract class PrismaRepositoryAdapterBase extends BaseAdapter {
   }
 }
 
-function toIso(date: Date | null | undefined): string | undefined {
-  return date ? date.toISOString() : undefined;
+function toIso(date: Date | null | undefined): ISODateString | undefined {
+  return date ? (date.toISOString() as ISODateString) : undefined;
 }
 
 function mapConversationTypeToPrisma(type: ConversationType): string {
   switch (type) {
     case 'follow-up':
+    case ConversationType.FollowUp:
       return 'follow_up';
     case 'medication-review':
+    case ConversationType.MedicationReview:
       return 'medication_review';
     case 'symptom-check':
+    case ConversationType.SymptomCheck:
       return 'symptom_check';
     case 'care-plan':
+    case ConversationType.CarePlan:
       return 'care_plan';
     default:
       return 'general';
@@ -64,15 +69,15 @@ function mapConversationTypeToPrisma(type: ConversationType): string {
 function mapConversationTypeFromPrisma(type: string): ConversationType {
   switch (type) {
     case 'follow_up':
-      return 'follow-up';
+      return ConversationType.FollowUp;
     case 'medication_review':
-      return 'medication-review';
+      return ConversationType.MedicationReview;
     case 'symptom_check':
-      return 'symptom-check';
+      return ConversationType.SymptomCheck;
     case 'care_plan':
-      return 'care-plan';
+      return ConversationType.CarePlan;
     default:
-      return 'general';
+      return ConversationType.General;
   }
 }
 
@@ -92,9 +97,9 @@ function mapConversation(record: PrismaConversationRecord): Conversation {
     summary: (record.summary as ConversationSummary | null) ?? null,
     messageIds: Array.isArray(record.messageIds) ? (record.messageIds as string[]).map((value) => value as UUID) : [],
     participantIds: Array.isArray(record.participantIds) ? (record.participantIds as string[]).map((value) => value as UUID) : [],
-    preferences: record.preferences as ChatPreferences,
-    createdAt: record.createdAt.toISOString(),
-    updatedAt: record.updatedAt.toISOString(),
+    preferences: record.preferences as unknown as ChatPreferences,
+    createdAt: record.createdAt.toISOString() as ISODateString,
+    updatedAt: record.updatedAt.toISOString() as ISODateString,
     archivedAt: toIso(record.archivedAt),
     pinnedAt: toIso(record.pinnedAt),
   };
@@ -106,7 +111,7 @@ function mapUser(record: PrismaUserRecord): User {
     displayName: record.displayName,
     email: record.email ?? undefined,
     avatarUrl: record.avatarUrl ?? undefined,
-    preferences: record.preferences as User['preferences'],
+    preferences: record.preferences as unknown as User['preferences'],
   };
 }
 
@@ -117,7 +122,7 @@ function mapAttachment(record: PrismaAttachmentRecord): Attachment {
     name: record.name,
     mimeType: record.mimeType,
     sizeBytes: record.sizeBytes,
-    createdAt: record.createdAt.toISOString(),
+    createdAt: record.createdAt.toISOString() as ISODateString,
   };
 }
 
@@ -129,8 +134,8 @@ function mapMessage(record: PrismaMessageRecord, attachments: Attachment[]): Mes
     status: record.status as MessageStatus,
     content: record.content,
     attachments,
-    createdAt: record.createdAt.toISOString(),
-    updatedAt: record.updatedAt.toISOString(),
+    createdAt: record.createdAt.toISOString() as ISODateString,
+    updatedAt: record.updatedAt.toISOString() as ISODateString,
     editedAt: toIso(record.editedAt),
   };
 }
@@ -142,13 +147,13 @@ function mapMedicalProfile(record: PrismaMedicalProfileRecord): MedicalProfile {
     emergencyLevel: record.emergencyLevel as EmergencyLevel,
     bodySystems: record.bodySystems as BodySystem[],
     diseaseCategories: record.diseaseCategories as DiseaseCategory[],
-    symptoms: record.symptoms as MedicalProfile['symptoms'],
-    medicines: record.medicines as MedicalProfile['medicines'],
-    allergies: record.allergies as MedicalProfile['allergies'],
+    symptoms: record.symptoms as unknown as MedicalProfile['symptoms'],
+    medicines: record.medicines as unknown as MedicalProfile['medicines'],
+    allergies: record.allergies as unknown as MedicalProfile['allergies'],
     vitalSigns: record.vitalSigns as VitalSigns,
-    healthMetrics: record.healthMetrics as HealthMetric[],
-    disclaimers: record.disclaimers as MedicalDisclaimer[],
-    updatedAt: record.updatedAt.toISOString(),
+    healthMetrics: record.healthMetrics as unknown as HealthMetric[],
+    disclaimers: record.disclaimers as unknown as MedicalDisclaimer[],
+    updatedAt: record.updatedAt.toISOString() as ISODateString,
   };
 }
 
@@ -159,17 +164,17 @@ function mapMemory(record: PrismaMemoryRecord): MemoryItem {
     type: mapMemoryTypeFromPrisma(record.type),
     content: record.content,
     sourceId: record.sourceId ? (record.sourceId as MemoryItem['sourceId']) : undefined,
-    createdAt: record.createdAt.toISOString(),
-    updatedAt: record.updatedAt.toISOString(),
+    createdAt: record.createdAt.toISOString() as ISODateString,
+    updatedAt: record.updatedAt.toISOString() as ISODateString,
   };
 }
 
 function mapSettings(record: PrismaUserSettingsRecord): Settings {
   return {
-    chat: record.chat as Settings['chat'],
-    privacy: record.privacy as Settings['privacy'],
-    security: record.security as Settings['security'],
-    appearance: record.appearance as Settings['appearance'],
+    chat: record.chat as unknown as Settings['chat'],
+    privacy: record.privacy as unknown as Settings['privacy'],
+    security: record.security as unknown as Settings['security'],
+    appearance: record.appearance as unknown as Settings['appearance'],
   };
 }
 
