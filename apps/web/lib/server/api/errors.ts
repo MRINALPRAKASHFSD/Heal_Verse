@@ -1,6 +1,6 @@
 import { ZodError } from 'zod';
 
-export type ApiErrorCode = 'bad_request' | 'not_found' | 'conflict' | 'rate_limited' | 'internal_error';
+export type ApiErrorCode = 'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited' | 'internal_error';
 
 export class ApiError extends Error {
   constructor(
@@ -10,6 +10,18 @@ export class ApiError extends Error {
     public readonly details?: Record<string, unknown>,
   ) {
     super(message);
+  }
+}
+
+export class UnauthorizedError extends ApiError {
+  constructor(message = 'Authentication required', details?: Record<string, unknown>) {
+    super('unauthorized', message, 401, details);
+  }
+}
+
+export class ForbiddenError extends ApiError {
+  constructor(message = 'Access forbidden', details?: Record<string, unknown>) {
+    super('forbidden', message, 403, details);
   }
 }
 
