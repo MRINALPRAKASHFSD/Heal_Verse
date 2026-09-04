@@ -2,37 +2,42 @@ import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import type { NextRequest } from 'next/server';
 import type { Conversation, Message, UUID } from '@healverse/application';
+import { ConversationType, MessageRole, MessageStatus, SupportedLanguage, Theme, type ISODateString } from '@healverse/shared';
 import { createConversationItemHandlers, createConversationMessagesHandlers, createConversationsCollectionHandlers, type ApiRuntime } from '@/lib/server/api';
 
-function createMockRequest(url: string, method: string, body?: unknown): NextRequest {
+function createMockRequest(url: string, method: string, body?: unknown, headers?: Record<string, string>): NextRequest {
   return {
     method,
-    headers: new Headers({ 'content-type': 'application/json', 'x-request-id': 'test-request-id' }),
+    headers: new Headers({
+      'content-type': 'application/json',
+      'x-request-id': 'test-request-id',
+      ...headers,
+    }),
     nextUrl: new URL(url),
     json: async () => body,
   } as unknown as NextRequest;
 }
 
-function createMockRuntime(): ApiRuntime {
+function createMockRuntime(defaultUserId: string = '22222222-2222-4222-8222-222222222222'): ApiRuntime {
   const conversations = new Map<string, Conversation>();
   const messages = new Map<string, Message[]>();
 
   const baseConversation: Conversation = {
     id: '11111111-1111-4111-8111-111111111111' as UUID,
     title: 'Medication follow-up',
-    type: 'general',
+    type: ConversationType.General,
     summary: null,
     messageIds: [],
     participantIds: ['22222222-2222-4222-8222-222222222222' as UUID],
     preferences: {
-      theme: 'system',
-      language: 'en-US',
+      theme: Theme.System,
+      language: SupportedLanguage.EnglishUS,
       sendWithEnter: true,
       compactMode: false,
       allowAttachments: true,
     },
-    createdAt: '2026-08-30T00:00:00.000Z',
-    updatedAt: '2026-08-30T00:00:00.000Z',
+    createdAt: '2026-08-30T00:00:00.000Z' as ISODateString,
+    updatedAt: '2026-08-30T00:00:00.000Z' as ISODateString,
   };
 
   conversations.set(baseConversation.id, baseConversation);
@@ -45,8 +50,36 @@ function createMockRuntime(): ApiRuntime {
     error: () => undefined,
   };
 
+  const authAdapter = {
+    async getSession(headers?: Headers) {
+      if (headers?.get('x-no-auth') === 'true') {
+        return null;
+      }
+      const userId = headers?.get('x-user-id') ?? defaultUserId;
+      return {
+        user: {
+          id: userId,
+          name: 'Test User',
+          email: 'test@example.com',
+          emailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        session: {
+          id: 'mock-session-id',
+          sessionId: 'mock-session-id',
+          userId,
+          token: 'mock-token',
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      };
+    },
+    async signOut() {},
+    getAuth: () => ({} as never),
+  };
+
   return {
-    container: {} as never,
+    container: { authAdapter } as never,
     logger,
     services: {
       conversationService: {
@@ -54,13 +87,13 @@ function createMockRuntime(): ApiRuntime {
           const conversation: Conversation = {
             id: '33333333-3333-4333-8333-333333333333' as UUID,
             title: input.title ?? 'Untitled conversation',
-            type: 'general',
+            type: ConversationType.General,
             summary: null,
             messageIds: [],
             participantIds: [input.userId],
             preferences: baseConversation.preferences,
-            createdAt: '2026-08-30T00:00:00.000Z',
-            updatedAt: '2026-08-30T00:00:00.000Z',
+            createdAt: '2026-08-30T00:00:00.000Z' as ISODateString,
+            updatedAt: '2026-08-30T00:00:00.000Z' as ISODateString,
           };
           conversations.set(conversation.id, conversation);
           messages.set(conversation.id, []);
@@ -84,7 +117,7 @@ function createMockRuntime(): ApiRuntime {
           if (!existing) {
             throw new Error('missing');
           }
-          const archived = { ...existing, archivedAt: '2026-08-30T00:00:00.000Z' };
+          const archived = { ...existing, archivedAt: '2026-08-30T00:00:00.000Z' as ISODateString };
           conversations.set(conversationId, archived);
           return archived;
         },
@@ -112,12 +145,12 @@ function createMockRuntime(): ApiRuntime {
             message: {
               id: '44444444-4444-4444-8444-444444444444' as UUID,
               conversationId: input.conversationId,
-              role: 'assistant',
-              status: 'sent',
+              role: MessageRole.Assistant,
+              status: MessageStatus.Sent,
               content: `Mock assistant response: ${input.message.content}`,
               attachments: [],
-              createdAt: '2026-08-30T00:00:00.000Z',
-              updatedAt: '2026-08-30T00:00:00.000Z',
+              createdAt: '2026-08-30T00:00:00.000Z' as ISODateString,
+              updatedAt: '2026-08-30T00:00:00.000Z' as ISODateString,
             },
           };
         },
@@ -149,13 +182,13 @@ function createMockRuntime(): ApiRuntime {
 }
 
 describe('conversation api handlers', () => {
-  it('creates and lists conversations', async () => {
+  it('creates and lists conversations deriving userId strictly from session', async () => {
     const runtime = createMockRuntime();
     const handlers = createConversationsCollectionHandlers(runtime);
 
+    // Client does NOT provide userId; server derives it from authenticated session
     const createResponse = await handlers.POST(
       createMockRequest('http://localhost/api/conversations', 'POST', {
-        userId: '22222222-2222-4222-8222-222222222222',
         title: 'Care check-in',
       }),
     );
@@ -163,15 +196,16 @@ describe('conversation api handlers', () => {
     assert.equal(createResponse.status, 200);
     const createBody = await createResponse.json();
     assert.equal(createBody.conversation.title, 'Care check-in');
+    assert.deepEqual(createBody.conversation.participantIds, ['22222222-2222-4222-8222-222222222222']);
 
-    const listResponse = await handlers.GET(createMockRequest('http://localhost/api/conversations?userId=22222222-2222-4222-8222-222222222222&page=1&pageSize=10', 'GET'));
+    const listResponse = await handlers.GET(createMockRequest('http://localhost/api/conversations?page=1&pageSize=10', 'GET'));
     assert.equal(listResponse.status, 200);
     const listBody = await listResponse.json();
     assert.equal(listBody.items.length >= 1, true);
     assert.equal(listBody.page, 1);
   });
 
-  it('retrieves updates and deletes a conversation', async () => {
+  it('retrieves updates and deletes a conversation for authenticated participant', async () => {
     const runtime = createMockRuntime();
     const handlers = createConversationItemHandlers(runtime);
 
@@ -198,6 +232,35 @@ describe('conversation api handlers', () => {
     assert.equal(deleteResponse.status, 200);
   });
 
+  it('rejects unauthenticated requests with 401 Unauthorized', async () => {
+    const runtime = createMockRuntime();
+    const handlers = createConversationsCollectionHandlers(runtime);
+
+    const response = await handlers.GET(
+      createMockRequest('http://localhost/api/conversations', 'GET', undefined, { 'x-no-auth': 'true' }),
+    );
+    assert.equal(response.status, 401);
+    const body = await response.json();
+    assert.equal(body.error.code, 'unauthorized');
+  });
+
+  it('rejects access from non-participant with 403 Forbidden', async () => {
+    const runtime = createMockRuntime();
+    const handlers = createConversationItemHandlers(runtime);
+
+    // Request as different user (not participant in 11111111-1111-4111-8111-111111111111)
+    const response = await handlers.GET(
+      createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'GET', undefined, {
+        'x-user-id': '99999999-9999-4999-8999-999999999999',
+      }),
+      { params: Promise.resolve({ conversationId: '11111111-1111-4111-8111-111111111111' }) },
+    );
+
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.error.code, 'forbidden');
+  });
+
   it('creates a message and returns a mock assistant reply', async () => {
     const runtime = createMockRuntime();
     const handlers = createConversationMessagesHandlers(runtime);
@@ -220,16 +283,5 @@ describe('conversation api handlers', () => {
     assert.equal(historyResponse.status, 200);
     const historyBody = await historyResponse.json();
     assert.equal(historyBody.items.length, 1);
-  });
-
-  it('returns validation errors with request ids', async () => {
-    const runtime = createMockRuntime();
-    const handlers = createConversationsCollectionHandlers(runtime);
-
-    const response = await handlers.POST(createMockRequest('http://localhost/api/conversations', 'POST', { title: 'Missing user id' }));
-    assert.equal(response.status, 400);
-    const body = await response.json();
-    assert.equal(body.requestId, 'test-request-id');
-    assert.equal(body.error.code, 'bad_request');
   });
 });
