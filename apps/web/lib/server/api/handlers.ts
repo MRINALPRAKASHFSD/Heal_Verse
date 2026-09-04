@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import type { Conversation, Message, UUID } from '@healverse/application';
-import { archiveConversationRequestSchema, createConversationRequestSchema, messageSchema, renameConversationRequestSchema, retrieveConversationRequestSchema, type CreateConversationRequestDto, type RenameConversationRequestDto, type ArchiveConversationRequestDto, type RetrieveConversationRequestDto } from '@healverse/application';
-import { conversationSchema, conversationSummarySchema, messageSchema as sharedMessageSchema } from '@healverse/shared';
-import { BadRequestError, InternalError, NotFoundError, normalizeError, RateLimitError } from './errors';
+import { archiveConversationRequestSchema, createConversationRequestSchema, renameConversationRequestSchema, retrieveConversationRequestSchema, type CreateConversationRequestDto, type RenameConversationRequestDto, type ArchiveConversationRequestDto, type RetrieveConversationRequestDto } from '@healverse/application';
+import { conversationSchema, conversationSummarySchema, messageSchema as sharedMessageSchema, MessageRole, MessageStatus, type ISODateString } from '@healverse/shared';
+import type { BetterAuthUser } from '@healverse/infrastructure';
+import { BadRequestError, ForbiddenError, InternalError, NotFoundError, UnauthorizedError, normalizeError, RateLimitError } from './errors';
 import { conversationCreateBodySchema, conversationItemParamsSchema, conversationListQuerySchema, conversationMessageCreateBodySchema, conversationMessageResponseSchema, conversationMessagesQuerySchema, conversationPageResponseSchema, conversationResponseSchema, conversationUpdateBodySchema, messagePageResponseSchema } from './schemas';
 import { getDefaultApiRuntime, type ApiRuntime } from './runtime';
 
@@ -139,18 +140,35 @@ async function executeRoute<T>(request: NextRequest, routeName: string, handler:
   }
 }
 
+async function getAuthenticatedUser(request: NextRequest, runtime: ApiRuntime): Promise<BetterAuthUser> {
+  const sessionPayload = await runtime.container?.authAdapter?.getSession?.(request.headers);
+  if (!sessionPayload || !sessionPayload.user) {
+    throw new UnauthorizedError('Authentication required to access conversations');
+  }
+
+  return sessionPayload.user;
+}
+
 export function createConversationsCollectionHandlers(runtime: ApiRuntime = getDefaultApiRuntime()) {
   return {
     GET: async (request: NextRequest) =>
       executeRoute(request, 'conversations.list', async () => {
+        const user = await getAuthenticatedUser(request, runtime);
         const query = conversationListQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams.entries()));
-        const result = await runtime.services.searchConversations(query);
+        const result = await runtime.services.searchConversations({
+          ...query,
+          userId: user.id as UUID,
+        });
         return conversationPageResponseSchema.parse(result);
       }),
     POST: async (request: NextRequest) =>
       executeRoute(request, 'conversations.create', async () => {
+        const user = await getAuthenticatedUser(request, runtime);
         const body = conversationCreateBodySchema.parse(await request.json());
-        const conversation = await runtime.services.conversationService.createConversation(body as CreateConversationRequestDto);
+        const conversation = await runtime.services.conversationService.createConversation({
+          title: body.title,
+          userId: user.id as UUID,
+        });
         return conversationResponseSchema.parse({ conversation });
       }),
   };
@@ -160,33 +178,43 @@ export function createConversationItemHandlers(runtime: ApiRuntime = getDefaultA
   return {
     GET: async (request: NextRequest, context?: RouteContext) =>
       executeRoute(request, 'conversations.retrieve', async () => {
+        const user = await getAuthenticatedUser(request, runtime);
         const params = conversationItemParamsSchema.parse(await parseParams(context));
-        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId);
+        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId as UUID);
         if (!conversation) {
           throw new NotFoundError('Conversation not found', { conversationId: params.conversationId });
+        }
+
+        if (!conversation.participantIds.includes(user.id as UUID)) {
+          throw new ForbiddenError('You do not have access to this conversation');
         }
 
         return conversationResponseSchema.parse({ conversation });
       }),
     PATCH: async (request: NextRequest, context?: RouteContext) =>
       executeRoute(request, 'conversations.update', async () => {
+        const user = await getAuthenticatedUser(request, runtime);
         const params = conversationItemParamsSchema.parse(await parseParams(context));
         const body = conversationUpdateBodySchema.parse(await request.json());
-        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId);
+        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId as UUID);
 
         if (!conversation) {
           throw new NotFoundError('Conversation not found', { conversationId: params.conversationId });
         }
 
+        if (!conversation.participantIds.includes(user.id as UUID)) {
+          throw new ForbiddenError('You do not have permission to update this conversation');
+        }
+
         let updatedConversation = conversation;
 
         if (body.title !== undefined) {
-          updatedConversation = await runtime.services.conversationService.renameConversation({ conversationId: params.conversationId, title: body.title });
+          updatedConversation = await runtime.services.conversationService.renameConversation({ conversationId: params.conversationId as UUID, title: body.title });
         }
 
         if (body.archived !== undefined) {
           updatedConversation = body.archived
-            ? await runtime.services.conversationService.archiveConversation(params.conversationId)
+            ? await runtime.services.conversationService.archiveConversation(params.conversationId as UUID)
             : await runtime.services.conversationService.saveConversation({
                 ...updatedConversation,
                 archivedAt: undefined,
@@ -197,8 +225,19 @@ export function createConversationItemHandlers(runtime: ApiRuntime = getDefaultA
       }),
     DELETE: async (request: NextRequest, context?: RouteContext) =>
       executeRoute(request, 'conversations.delete', async () => {
+        const user = await getAuthenticatedUser(request, runtime);
         const params = conversationItemParamsSchema.parse(await parseParams(context));
-        await runtime.services.conversationService.deleteConversation(params.conversationId);
+        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId as UUID);
+
+        if (!conversation) {
+          throw new NotFoundError('Conversation not found', { conversationId: params.conversationId });
+        }
+
+        if (!conversation.participantIds.includes(user.id as UUID)) {
+          throw new ForbiddenError('You do not have permission to delete this conversation');
+        }
+
+        await runtime.services.conversationService.deleteConversation(params.conversationId as UUID);
         return { ok: true };
       }),
   };
@@ -208,37 +247,53 @@ export function createConversationMessagesHandlers(runtime: ApiRuntime = getDefa
   return {
     GET: async (request: NextRequest, context?: RouteContext) =>
       executeRoute(request, 'conversations.messages.list', async () => {
+        const user = await getAuthenticatedUser(request, runtime);
         const params = conversationItemParamsSchema.parse(await parseParams(context));
-        const query = conversationMessagesQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams.entries()));
-        const result = await runtime.services.listConversationMessages({ conversationId: params.conversationId, page: query.page, pageSize: query.pageSize });
-        return messagePageResponseSchema.parse(result);
-      }),
-    POST: async (request: NextRequest, context?: RouteContext) =>
-      executeRoute(request, 'conversations.messages.create', async () => {
-        const params = conversationItemParamsSchema.parse(await parseParams(context));
-        const body = conversationMessageCreateBodySchema.parse(await request.json());
-        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId);
+        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId as UUID);
 
         if (!conversation) {
           throw new NotFoundError('Conversation not found', { conversationId: params.conversationId });
         }
 
+        if (!conversation.participantIds.includes(user.id as UUID)) {
+          throw new ForbiddenError('You do not have permission to view messages in this conversation');
+        }
+
+        const query = conversationMessagesQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams.entries()));
+        const result = await runtime.services.listConversationMessages({ conversationId: params.conversationId as UUID, page: query.page, pageSize: query.pageSize });
+        return messagePageResponseSchema.parse(result);
+      }),
+    POST: async (request: NextRequest, context?: RouteContext) =>
+      executeRoute(request, 'conversations.messages.create', async () => {
+        const user = await getAuthenticatedUser(request, runtime);
+        const params = conversationItemParamsSchema.parse(await parseParams(context));
+        const body = conversationMessageCreateBodySchema.parse(await request.json());
+        const conversation = await runtime.services.conversationService.retrieveConversation(params.conversationId as UUID);
+
+        if (!conversation) {
+          throw new NotFoundError('Conversation not found', { conversationId: params.conversationId });
+        }
+
+        if (!conversation.participantIds.includes(user.id as UUID)) {
+          throw new ForbiddenError('You do not have permission to send messages in this conversation');
+        }
+
         const userMessage = await runtime.services.aiService.sendMessage({
-          conversationId: params.conversationId,
+          conversationId: params.conversationId as UUID,
           message: {
             id: randomUUID() as UUID,
-            conversationId: params.conversationId,
-            role: 'user',
-            status: 'sent',
+            conversationId: params.conversationId as UUID,
+            role: MessageRole.User,
+            status: MessageStatus.Sent,
             content: body.content,
             attachments: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString() as ISODateString,
+            updatedAt: new Date().toISOString() as ISODateString,
           },
         });
 
         const assistantMessage = await runtime.services.aiService.receiveMessage({
-          conversationId: params.conversationId,
+          conversationId: params.conversationId as UUID,
           message: userMessage.message,
         });
 

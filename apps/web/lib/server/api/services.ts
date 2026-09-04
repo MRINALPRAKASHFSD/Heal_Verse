@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ConversationService, AIService, MemoryService, MedicalService, TranslationService, SafetyService, LanguageService, VoiceService, AnalyticsService, NotificationService, CreateConversationInput, RenameConversationInput, SendMessageInput, SendMessageResult, ReceiveMessageInput, ReceiveMessageResult, GenerateConversationTitleInput, GenerateConversationTitleResult, RetrieveConversationInput } from '@healverse/application';
 import type { Conversation, Message, Settings, UUID, Logger, ConversationSummary } from '@healverse/application';
 import type { ConversationRepository, MessageRepository, SettingsRepository, UserRepository, MedicalRepository, MemoryRepository } from '@healverse/application';
-import type { ChatPreferences, SupportedLanguage, Theme } from '@healverse/shared';
+import { ConversationType, MessageRole, MessageStatus, type ChatPreferences, type ISODateString, type SupportedLanguage, type Theme } from '@healverse/shared';
 import { BadRequestError, NotFoundError } from './errors';
 
 export interface ApiServicesDependencies {
@@ -96,12 +96,12 @@ function buildSummary(conversation: Conversation, messages: Message[]): Conversa
 }
 
 function createConversationStub(input: CreateConversationInput, settings?: Settings | null): Conversation {
-  const now = new Date().toISOString();
+  const now = new Date().toISOString() as ISODateString;
 
   return {
     id: randomUUID() as UUID,
     title: input.title?.trim() || 'Untitled conversation',
-    type: 'general',
+    type: ConversationType.General,
     summary: null,
     messageIds: [],
     participantIds: [input.userId],
@@ -112,13 +112,13 @@ function createConversationStub(input: CreateConversationInput, settings?: Setti
 }
 
 function createMessageStub(conversationId: UUID, content: string, role: Message['role']): Message {
-  const now = new Date().toISOString();
+  const now = new Date().toISOString() as ISODateString;
 
   return {
     id: randomUUID() as UUID,
     conversationId,
     role,
-    status: 'sent',
+    status: MessageStatus.Sent,
     content,
     attachments: [],
     createdAt: now,
@@ -164,7 +164,7 @@ class ConversationServiceImpl implements ConversationService {
 
     return this.dependencies.conversationRepository.update({
       ...conversation,
-      archivedAt: new Date().toISOString(),
+      archivedAt: new Date().toISOString() as ISODateString,
     });
   }
 
@@ -192,7 +192,7 @@ class AiServiceImpl implements AIService {
   }
 
   async receiveMessage(input: ReceiveMessageInput): Promise<ReceiveMessageResult> {
-    const response = createMessageStub(input.conversationId, `Mock assistant response: ${truncatePreview(input.message.content, 100)}`, 'assistant');
+    const response = createMessageStub(input.conversationId, `Mock assistant response: ${truncatePreview(input.message.content, 100)}`, MessageRole.Assistant);
     return { message: response };
   }
 }
