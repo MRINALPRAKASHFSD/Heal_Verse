@@ -6,11 +6,15 @@ export function ChatHeader({
   onOpenSidebar,
   onToggleContext,
   contextOpen,
+  messageSearchValue,
+  onMessageSearchChange,
 }: {
   title: string;
   onOpenSidebar: () => void;
   onToggleContext: () => void;
   contextOpen: boolean;
+  messageSearchValue: string;
+  onMessageSearchChange: (value: string) => void;
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-xl md:px-6">
@@ -24,7 +28,7 @@ export function ChatHeader({
         </div>
         <div className="hidden min-w-0 flex-1 max-w-md items-center gap-2 lg:flex">
           <Search className="absolute ml-4 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-10" placeholder="Search within this conversation" />
+          <Input className="pl-10" placeholder="Search within this conversation" value={messageSearchValue} onChange={(event) => onMessageSearchChange(event.target.value)} />
         </div>
         <Button aria-label="Notifications" variant="ghost">
           <Bell className="h-5 w-5" />

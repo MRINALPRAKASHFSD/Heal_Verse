@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
-import type { ChatMessage } from '@/features/chat/mock-data';
+import type { Message } from '@/lib/api/conversations';
 import { Avatar, Card } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
-export function ChatBubble({ message }: { message: ChatMessage }) {
+export function ChatBubble({ message }: { message: Message & { isStreaming?: boolean } }) {
   const isUser = message.role === 'user';
+  const isStreaming = message.status === 'streaming' || message.isStreaming;
 
   return (
     <motion.div
@@ -24,8 +25,8 @@ export function ChatBubble({ message }: { message: ChatMessage }) {
       >
         <p>{message.content}</p>
         <div className={cn('mt-2 text-[11px] uppercase tracking-[0.25em]', isUser ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
-          {message.timestamp}
-          {message.isStreaming ? ' · streaming' : ''}
+          {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {isStreaming ? ' · streaming' : ''}
         </div>
       </Card>
       {isUser ? <Avatar className="mt-1 h-9 w-9 shrink-0 bg-secondary text-xs text-secondary-foreground">U</Avatar> : null}
