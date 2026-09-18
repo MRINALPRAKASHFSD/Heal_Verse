@@ -16,10 +16,12 @@ export function ChatInput({
   onSend,
   isDisabled,
   isSubmitting,
+  onRequireAuth,
 }: {
   onSend: (content: string) => Promise<void> | void;
   isDisabled?: boolean;
   isSubmitting?: boolean;
+  onRequireAuth?: () => void;
 }) {
   const {
     register,
@@ -32,6 +34,10 @@ export function ChatInput({
   });
 
   async function submit(values: MessageFormValues) {
+    if (onRequireAuth) {
+      onRequireAuth();
+      return;
+    }
     await onSend(values.content);
     reset();
   }
@@ -39,17 +45,30 @@ export function ChatInput({
   return (
     <Card className="border-t border-border bg-background/90 p-3 shadow-none backdrop-blur-xl md:p-4">
       <form className="flex items-end gap-3" onSubmit={handleSubmit(submit)}>
-        <Button aria-label="Attach file" disabled size="sm" variant="secondary">
+        <Button aria-label="Attach file" disabled size="sm" variant="secondary" type="button" onClick={onRequireAuth}>
           <Paperclip className="h-4 w-4" />
         </Button>
-        <Button aria-label="Voice input" disabled size="sm" variant="secondary">
+        <Button aria-label="Voice input" disabled size="sm" variant="secondary" type="button" onClick={onRequireAuth}>
           <Volume2 className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
-          <Input aria-label="Message input" placeholder="Ask about care plans, medication routines, or next steps" {...register('content')} disabled={isDisabled || isSubmitting} />
+        <div className="flex-1" onClick={onRequireAuth}>
+          <Input
+            aria-label="Message input"
+            placeholder={onRequireAuth ? 'Sign in to ask about care plans, medication routines, or next steps' : 'Ask about care plans, medication routines, or next steps'}
+            {...register('content')}
+            disabled={!onRequireAuth && (isDisabled || isSubmitting)}
+            readOnly={Boolean(onRequireAuth)}
+            className={onRequireAuth ? 'cursor-pointer' : undefined}
+          />
           {errors.content ? <p className="mt-2 text-xs text-danger">{errors.content.message}</p> : null}
         </div>
-        <Button aria-label="Send message" size="sm" type="submit" disabled={isDisabled || isSubmitting}>
+        <Button
+          aria-label="Send message"
+          size="sm"
+          type={onRequireAuth ? 'button' : 'submit'}
+          disabled={!onRequireAuth && (isDisabled || isSubmitting)}
+          onClick={onRequireAuth}
+        >
           <Send className="h-4 w-4" />
         </Button>
       </form>

@@ -1,5 +1,6 @@
 import { AppShell } from '@/components/layout/app-shell';
 
-export default function HomePage({ searchParams }: { searchParams?: { conversationId?: string } }) {
-  return <AppShell initialConversationId={searchParams?.conversationId} />;
+export default async function HomePage({ searchParams }: { searchParams?: Promise<{ conversationId?: string }> }) {
+  const resolvedParams = await searchParams;
+  return <AppShell initialConversationId={resolvedParams?.conversationId} />;
 }

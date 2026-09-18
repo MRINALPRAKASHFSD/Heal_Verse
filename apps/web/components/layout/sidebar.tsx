@@ -96,42 +96,66 @@ export function Sidebar({
       </div>
 
       <div className="space-y-2 overflow-y-auto pr-1">
-        {groupOrder.map((group) => (
-          <section key={group} className="space-y-2">
-            <p className="px-1 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">{group}</p>
-            {chats
-              .filter((chat) => chat.group === group)
-              .map((chat) => (
-                <Card key={chat.id} className={cn('p-3 transition', selectedConversationId === chat.id ? 'border-primary/40 bg-accent/60' : 'cursor-pointer hover:border-primary/30 hover:bg-accent/60')}>
-                  <div className="flex items-start gap-3">
-                    <button className="flex min-w-0 flex-1 items-start gap-3 text-left" type="button" onClick={() => onSelectConversation(chat.id)}>
-                      <Clock3 className="mt-1 h-4 w-4 text-medical" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{chat.title}</p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{chat.summary}</p>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">{chat.time}</span>
-                    </button>
-                    <Dropdown
-                      label={
-                        <Button aria-label={`Conversation actions for ${chat.title}`} className="h-8 w-8 rounded-full p-0" size="sm" variant="ghost">
-                          <EllipsisVertical className="h-4 w-4" />
-                        </Button>
-                      }
-                    >
-                      <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-accent" onClick={() => onRenameConversation(chat)} type="button">
-                        Rename
+        {!currentUser ? (
+          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
+            <p className="text-xs leading-5 text-muted-foreground">
+              Sign in to save and access your care conversations.
+            </p>
+          </div>
+        ) : chats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
+            <p className="text-xs text-muted-foreground">No conversations yet</p>
+          </div>
+        ) : (
+          groupOrder.map((group) => {
+            const groupChats = chats.filter((chat) => chat.group === group);
+            if (groupChats.length === 0) {
+              return null;
+            }
+            return (
+              <section key={group} className="space-y-2">
+                <p className="px-1 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">{group}</p>
+                {groupChats.map((chat) => (
+                  <Card
+                    key={chat.id}
+                    className={cn(
+                      'p-3 transition',
+                      selectedConversationId === chat.id
+                        ? 'border-primary/40 bg-accent/60'
+                        : 'cursor-pointer hover:border-primary/30 hover:bg-accent/60',
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <button className="flex min-w-0 flex-1 items-start gap-3 text-left" type="button" onClick={() => onSelectConversation(chat.id)}>
+                        <Clock3 className="mt-1 h-4 w-4 text-medical" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{chat.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{chat.summary}</p>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">{chat.time}</span>
                       </button>
-                      <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-danger hover:bg-accent" onClick={() => onDeleteConversation(chat)} type="button">
-                        Delete
-                      </button>
-                    </Dropdown>
-                  </div>
-                </Card>
-              ))}
-          </section>
-        ))}
-        {hasMore ? (
+                      <Dropdown
+                        label={
+                          <Button aria-label={`Conversation actions for ${chat.title}`} className="h-8 w-8 rounded-full p-0" size="sm" variant="ghost">
+                            <EllipsisVertical className="h-4 w-4" />
+                          </Button>
+                        }
+                      >
+                        <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-accent" onClick={() => onRenameConversation(chat)} type="button">
+                          Rename
+                        </button>
+                        <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-danger hover:bg-accent" onClick={() => onDeleteConversation(chat)} type="button">
+                          Delete
+                        </button>
+                      </Dropdown>
+                    </div>
+                  </Card>
+                ))}
+              </section>
+            );
+          })
+        )}
+        {hasMore && currentUser ? (
           <Button className="w-full" disabled={isLoadingMore} variant="secondary" onClick={onLoadMore}>
             {isLoadingMore ? 'Loading more…' : 'Load more chats'}
           </Button>

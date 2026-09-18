@@ -8,6 +8,7 @@ export function ChatHeader({
   contextOpen,
   messageSearchValue,
   onMessageSearchChange,
+  hasActiveConversation,
 }: {
   title: string;
   onOpenSidebar: () => void;
@@ -15,6 +16,7 @@ export function ChatHeader({
   contextOpen: boolean;
   messageSearchValue: string;
   onMessageSearchChange: (value: string) => void;
+  hasActiveConversation?: boolean;
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-xl md:px-6">
@@ -26,10 +28,12 @@ export function ChatHeader({
           <h1 className="truncate text-base font-semibold sm:text-lg">{title}</h1>
           <p className="truncate text-xs text-muted-foreground">Calm, private, and accessible care support</p>
         </div>
-        <div className="hidden min-w-0 flex-1 max-w-md items-center gap-2 lg:flex">
-          <Search className="absolute ml-4 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-10" placeholder="Search within this conversation" value={messageSearchValue} onChange={(event) => onMessageSearchChange(event.target.value)} />
-        </div>
+        {hasActiveConversation ? (
+          <div className="hidden min-w-0 flex-1 max-w-md items-center gap-2 lg:flex">
+            <Search className="absolute ml-4 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-10" placeholder="Search within this conversation" value={messageSearchValue} onChange={(event) => onMessageSearchChange(event.target.value)} />
+          </div>
+        ) : null}
         <Button aria-label="Notifications" variant="ghost">
           <Bell className="h-5 w-5" />
         </Button>

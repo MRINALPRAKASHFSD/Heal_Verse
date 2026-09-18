@@ -138,13 +138,34 @@ npx pnpm --dir apps/web build
 
 ---
 
-## Environment Configuration
+## Frontend State & Rendering Regression Fix (Post Better-Auth Migration)
 
-Copy `.env.example` to `.env`:
-```bash
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/healverse"
-NEXT_PUBLIC_APP_NAME="HealVerse"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-BETTER_AUTH_SECRET="your-secure-random-secret-key-min-32-chars"
-BETTER_AUTH_URL="http://localhost:3000"
-```
+### Problem Addressed
+Immediately following the Better Auth migration, the browser UI exhibited two critical issues:
+1. **Broken Layout & Unstyled Components**: Legacy Tailwind v3 directives (`@tailwind base; @tailwind components; @tailwind utilities;`) in `apps/web/app/globals.css` were ignored by `@tailwindcss/postcss` (Tailwind v4), preventing generation of responsive breakpoints (`md:block`, `md:hidden`, `lg:flex`, `xl:block`) and theme tokens. This caused the desktop sidebar to hide, the mobile drawer header to permanently collide with the top navigation, and UI components to render unstyled.
+2. **Inconsistent Unauthenticated Workspace State**:
+   - `TypingIndicator` ("Thinking...") was unconditionally mounted, rendering a perpetual AI loading indicator for unauthenticated visitors.
+   - The Sidebar rendered empty `TODAY`, `YESTERDAY`, and `OLDER` categories with zero chats.
+   - The ChatHeader showed an active conversation search input without an active conversation.
+   - The ContextPanel showed conversation summary notes for non-existent chats.
+   - `apps/web/app/page.tsx` synchronously read `searchParams.conversationId`, triggering Next.js 15+ async dynamic API runtime console errors.
+
+### Solution Applied
+- **Tailwind v4 Setup**: Migrated `apps/web/app/globals.css` to `@import "tailwindcss"; @config "../../../tailwind.config.ts";`, restoring all responsive breakpoints, dark mode behavior, and theme variables.
+- **Page Routing**: Awaited `searchParams` in `apps/web/app/page.tsx` (`await searchParams`).
+- **AppShell**:
+  - Guarded `TypingIndicator` to render strictly when `currentUser != null && sendMessageMutation.isPending`.
+  - Pass `hasActiveConversation` to `ChatHeader` and `isAuthenticated` to `ContextPanel`.
+  - Wire `onRequireAuth` into `ChatInput` to direct visitors toward authentication.
+- **Sidebar**: Replaced empty chronological headings with a clean prompt ("Sign in to save and access your care conversations") when unauthenticated, and "No conversations yet" when authenticated with zero chats.
+- **ChatHeader**: Hidden conversation search input when no active conversation is selected.
+- **ContextPanel**: Added `isAuthenticated` prop to render a calm PHI security and clinical trust overview when unauthenticated.
+- **ChatInput**: Supported `onRequireAuth` to safely open sign-in modal on click without firing mutations.
+- **Auth Synchronization**: Optimistically populated `queryClient.setQueryData(authQueryKeys.me(), result.data)` in `useSignInMutation` and `useSignUpMutation` to prevent auth-state flicker.
+
+### Validation Results
+- **Unit & Integration Tests**: `npx tsx --tsconfig apps/web/tsconfig.json --test apps/web/tests/api/conversations.handlers.test.ts` (5/5 PASS)
+- **TypeScript Typecheck**: `npx -y pnpm@9.12.2 --dir apps/web typecheck` (0 errors)
+- **Production Build**: `npx -y pnpm@9.12.2 --dir apps/web build` (Exit code 0, all routes compiled)
+- **Browser Verification**: Desktop (1280x800) and mobile (390x844) viewports verified via browser subagent with screenshot capture; confirmed correct layout, no overlapping drawer, no rogue typing indicator, and responsive drawer functionality.
+- **Security Boundary**: Zero changes to Better Auth security architecture, Prisma schemas, or API authorization.
