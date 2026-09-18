@@ -283,11 +283,12 @@ export function AppShell({ initialConversationId }: { initialConversationId?: st
       <main className="flex min-h-screen min-w-0 flex-1 flex-col">
         <ChatHeader
           contextOpen={contextOpen}
+          hasActiveConversation={Boolean(currentUser && activeConversation && selectedConversationId)}
           messageSearchValue={messageSearch}
           onMessageSearchChange={setMessageSearch}
           onOpenSidebar={() => setSidebarOpen(true)}
           onToggleContext={() => setContextOpen((current) => !current)}
-          title={activeConversationTitle}
+          title={currentUser ? activeConversationTitle : 'HealVerse'}
         />
 
         <section className="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 md:px-6 lg:px-8">
@@ -298,7 +299,9 @@ export function AppShell({ initialConversationId }: { initialConversationId?: st
           >
             <div className="flex min-w-0 flex-col gap-6">
               <Card className="overflow-hidden border-border/70 bg-card/80 p-6 shadow-sm backdrop-blur-xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Welcome screen</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                  {currentUser ? 'Care workspace' : 'Welcome screen'}
+                </p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight">
                   {currentUser
                     ? activeConversation
@@ -309,7 +312,7 @@ export function AppShell({ initialConversationId }: { initialConversationId?: st
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
                   {currentUser
                     ? 'Session-derived authenticated workspace. Optimistic message delivery and care plan navigation.'
-                    : 'Please sign in or create an account to start managing your health conversations and care planning.'}
+                    : 'A private, session-authenticated healthcare workspace. Sign in or create an account to start managing your health conversations, medication routines, and care planning.'}
                 </p>
               </Card>
 
@@ -344,15 +347,17 @@ export function AppShell({ initialConversationId }: { initialConversationId?: st
                   />
                 )}
 
-                {messagesQuery.hasNextPage ? (
+                {currentUser && messagesQuery.hasNextPage ? (
                   <Button className="mx-auto" disabled={messagesQuery.isFetchingNextPage} onClick={() => messagesQuery.fetchNextPage()} variant="secondary">
                     {messagesQuery.isFetchingNextPage ? 'Loading more…' : 'Load older messages'}
                   </Button>
                 ) : null}
 
-                <div className="pt-2">
-                  <TypingIndicator />
-                </div>
+                {currentUser && sendMessageMutation.isPending ? (
+                  <div className="pt-2">
+                    <TypingIndicator />
+                  </div>
+                ) : null}
               </div>
 
               <Card className="p-4 md:p-6">
@@ -364,6 +369,7 @@ export function AppShell({ initialConversationId }: { initialConversationId?: st
                       key={question}
                       onClick={() => {
                         if (!currentUser) {
+                          setAuthMode('sign-in');
                           setAuthModalOpen(true);
                         } else {
                           handleSendMessage(question);
@@ -378,13 +384,14 @@ export function AppShell({ initialConversationId }: { initialConversationId?: st
               </Card>
 
               <ChatInput
-                isDisabled={!currentUser || !selectedConversationId || sendMessageMutation.isPending}
+                isDisabled={Boolean(currentUser && (!selectedConversationId || sendMessageMutation.isPending))}
                 isSubmitting={sendMessageMutation.isPending}
+                onRequireAuth={!currentUser ? () => { setAuthMode('sign-in'); setAuthModalOpen(true); } : undefined}
                 onSend={handleSendMessage}
               />
             </div>
 
-            <ContextPanel collapsed={!contextOpen} />
+            <ContextPanel collapsed={!contextOpen} isAuthenticated={Boolean(currentUser)} />
           </motion.div>
         </section>
       </main>

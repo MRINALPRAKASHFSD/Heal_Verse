@@ -61,7 +61,10 @@ export function useSignInMutation() {
       }
       return result.data;
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data && typeof data === 'object' && 'user' in data && 'session' in data) {
+        queryClient.setQueryData(authQueryKeys.me(), data as unknown as AuthResponse);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: authQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversations() }),
@@ -85,7 +88,10 @@ export function useSignUpMutation() {
       }
       return result.data;
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data && typeof data === 'object' && 'user' in data && 'session' in data) {
+        queryClient.setQueryData(authQueryKeys.me(), data as unknown as AuthResponse);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: authQueryKeys.all }),
         queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversations() }),
