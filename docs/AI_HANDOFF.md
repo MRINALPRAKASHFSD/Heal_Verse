@@ -169,3 +169,57 @@ Immediately following the Better Auth migration, the browser UI exhibited two cr
 - **Production Build**: `npx -y pnpm@9.12.2 --dir apps/web build` (Exit code 0, all routes compiled)
 - **Browser Verification**: Desktop (1280x800) and mobile (390x844) viewports verified via browser subagent with screenshot capture; confirmed correct layout, no overlapping drawer, no rogue typing indicator, and responsive drawer functionality.
 - **Security Boundary**: Zero changes to Better Auth security architecture, Prisma schemas, or API authorization.
+
+---
+
+## Phase 3: End-to-End Authenticated Conversation Persistence
+
+### Implementation Details
+- **Prisma Client Default ID Generation**: Added `$extends` query client extension in `packages/database/src/client/prisma.client.ts` that automatically populates `crypto.randomUUID()` on create for models lacking `@default(uuid())` in schema (`Account`, `Session`, `Verification`).
+- **Better Auth Version Alignment**: Updated `better-auth` and `@better-auth/prisma-adapter` to `1.7.5` across the monorepo, fixing the Better Auth 1.7.0–1.7.2 regression where an extraneous `issuer` field was sent to the Prisma adapter on account creation.
+- **Database Migrations Deployed**: Applied pending migrations non-destructively via `npx prisma migrate deploy` (`20260830000000_initial` and `20260904000000_better_auth`). Verified schema status is in sync with zero data loss.
+- **Client-Supplied Ownership Guard**: Verified and tested that client-sent `userId` in conversation creation payloads is strictly ignored and non-binding; server derives owner strictly from verified Better Auth session.
+- **Cross-User Authorization**: Confirmed `403 Forbidden` across conversation retrieval, update, deletion, message retrieval, and message dispatch for non-participants.
+
+### Automated Test Suites
+- `apps/web/tests/api/conversations.handlers.test.ts`:
+  - `creates and lists conversations deriving userId strictly from session, ignoring client-supplied userId` (PASS)
+  - `retrieves updates and deletes a conversation for authenticated participant` (PASS)
+  - `rejects unauthenticated requests with 401 Unauthorized across all conversation and message endpoints` (PASS)
+  - `rejects cross-user access: User B cannot retrieve, update, or delete User A conversation (403 Forbidden)` (PASS)
+  - `isolates conversation lists between different users` (PASS)
+  - `creates a message, returns a mock assistant reply, and rejects cross-user message access (403 Forbidden)` (PASS)
+- `apps/web/tests/api/me.handlers.test.ts`:
+  - `returns 401 Unauthorized when request has no active session` (PASS)
+- `apps/web/tests/api/e2e.persistence.test.ts` (Live API E2E):
+  - `Step 1: Register User A and receive session cookie` (PASS)
+  - `Step 2: Verify authenticated /api/me for User A` (PASS)
+  - `Step 3: User A creates a conversation, ignoring client-supplied userId` (PASS)
+  - `Step 4: User A posts a message to Conversation A` (PASS)
+  - `Step 5: User A retrieves messages for Conversation A (persisted in database)` (PASS)
+  - `Step 6: Register User B and verify cross-user isolation` (PASS)
+  - `Step 7: User B cannot list, retrieve, update, delete, or message Conversation A` (PASS)
+  - `Step 8: User A signs out and session is invalidated` (PASS)
+  - `Step 9: User A logs back in and recovers conversation and messages` (PASS)
+
+### Browser Verification Results
+- **Test A (Registration & Session Refresh)**: Registered new user in browser; authenticated workspace loaded; page refreshed; session persisted with zero flicker.
+- **Test B (Conversation Creation & Message Persistence)**: Created conversation, sent message; refreshed page; conversation and message remained fully rendered in UI.
+- **Test C (Logout)**: User signed out; returned to clean unauthenticated guest workspace; protected endpoints reject with 401.
+- **Test D (Re-login & Data Recovery)**: Logged back in with User A credentials; previous conversation and message immediately restored in sidebar and chat feed.
+- **Test E (Cross-User Isolation)**: Registered User B; verified empty conversation list; User A's data completely inaccessible to User B.
+- **Visual Artifacts**:
+  - `01_unauthenticated_workspace.png`
+  - `02_authenticated_workspace.png`
+  - `03_post_refresh_authenticated.png`
+  - `04_conversation_and_message.png`
+  - `05_refreshed_conversation_persisted.png`
+  - `06_logged_out_guest_workspace.png`
+  - `07_relogin_restored_session.png`
+  - `08_user_b_isolated_workspace.png`
+
+### Validation Status
+- **API Tests**: 16/16 PASS across 3 test suites.
+- **TypeScript**: 0 errors across `@healverse/database`, `@healverse/infrastructure`, and `@healverse/web`.
+- **Production Build**: 0 errors, successful static and dynamic route compilation.
+- **Remaining Blockers**: None. System is ready for Phase 4 (AI Provider Integration).
