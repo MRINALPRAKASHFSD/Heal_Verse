@@ -182,14 +182,15 @@ function createMockRuntime(defaultUserId: string = '22222222-2222-4222-8222-2222
 }
 
 describe('conversation api handlers', () => {
-  it('creates and lists conversations deriving userId strictly from session', async () => {
+  it('creates and lists conversations deriving userId strictly from session, ignoring client-supplied userId', async () => {
     const runtime = createMockRuntime();
     const handlers = createConversationsCollectionHandlers(runtime);
 
-    // Client does NOT provide userId; server derives it from authenticated session
+    // Client attempts to pass a fake/arbitrary userId, but server must ignore it
     const createResponse = await handlers.POST(
       createMockRequest('http://localhost/api/conversations', 'POST', {
         title: 'Care check-in',
+        userId: '99999999-9999-4999-8999-999999999999',
       }),
     );
 
@@ -232,42 +233,113 @@ describe('conversation api handlers', () => {
     assert.equal(deleteResponse.status, 200);
   });
 
-  it('rejects unauthenticated requests with 401 Unauthorized', async () => {
+  it('rejects unauthenticated requests with 401 Unauthorized across all conversation and message endpoints', async () => {
     const runtime = createMockRuntime();
-    const handlers = createConversationsCollectionHandlers(runtime);
+    const collectionHandlers = createConversationsCollectionHandlers(runtime);
+    const itemHandlers = createConversationItemHandlers(runtime);
+    const messageHandlers = createConversationMessagesHandlers(runtime);
 
-    const response = await handlers.GET(
-      createMockRequest('http://localhost/api/conversations', 'GET', undefined, { 'x-no-auth': 'true' }),
-    );
-    assert.equal(response.status, 401);
-    const body = await response.json();
-    assert.equal(body.error.code, 'unauthorized');
+    const unauthHeaders = { 'x-no-auth': 'true' };
+    const convParams = { params: Promise.resolve({ conversationId: '11111111-1111-4111-8111-111111111111' }) };
+
+    // Collection GET
+    const listRes = await collectionHandlers.GET(createMockRequest('http://localhost/api/conversations', 'GET', undefined, unauthHeaders));
+    assert.equal(listRes.status, 401);
+
+    // Collection POST
+    const createRes = await collectionHandlers.POST(createMockRequest('http://localhost/api/conversations', 'POST', { title: 'New' }, unauthHeaders));
+    assert.equal(createRes.status, 401);
+
+    // Item GET
+    const getRes = await itemHandlers.GET(createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'GET', undefined, unauthHeaders), convParams);
+    assert.equal(getRes.status, 401);
+
+    // Item PATCH
+    const patchRes = await itemHandlers.PATCH(createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'PATCH', { title: 'Updated' }, unauthHeaders), convParams);
+    assert.equal(patchRes.status, 401);
+
+    // Item DELETE
+    const delRes = await itemHandlers.DELETE(createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'DELETE', undefined, unauthHeaders), convParams);
+    assert.equal(delRes.status, 401);
+
+    // Messages GET
+    const msgGetRes = await messageHandlers.GET(createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111/messages', 'GET', undefined, unauthHeaders), convParams);
+    assert.equal(msgGetRes.status, 401);
+
+    // Messages POST
+    const msgPostRes = await messageHandlers.POST(createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111/messages', 'POST', { content: 'hello' }, unauthHeaders), convParams);
+    assert.equal(msgPostRes.status, 401);
   });
 
-  it('rejects access from non-participant with 403 Forbidden', async () => {
+  it('rejects cross-user access: User B cannot retrieve, update, or delete User A conversation (403 Forbidden)', async () => {
     const runtime = createMockRuntime();
     const handlers = createConversationItemHandlers(runtime);
 
-    // Request as different user (not participant in 11111111-1111-4111-8111-111111111111)
-    const response = await handlers.GET(
-      createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'GET', undefined, {
-        'x-user-id': '99999999-9999-4999-8999-999999999999',
-      }),
-      { params: Promise.resolve({ conversationId: '11111111-1111-4111-8111-111111111111' }) },
-    );
+    const userBHeaders = { 'x-user-id': '99999999-9999-4999-8999-999999999999' };
+    const convParams = { params: Promise.resolve({ conversationId: '11111111-1111-4111-8111-111111111111' }) };
 
-    assert.equal(response.status, 403);
-    const body = await response.json();
-    assert.equal(body.error.code, 'forbidden');
+    // Retrieve attempt
+    const getRes = await handlers.GET(
+      createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'GET', undefined, userBHeaders),
+      convParams,
+    );
+    assert.equal(getRes.status, 403);
+    const getBody = await getRes.json();
+    assert.equal(getBody.error.code, 'forbidden');
+
+    // Update attempt
+    const patchRes = await handlers.PATCH(
+      createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'PATCH', { title: 'Hacked title' }, userBHeaders),
+      convParams,
+    );
+    assert.equal(patchRes.status, 403);
+    const patchBody = await patchRes.json();
+    assert.equal(patchBody.error.code, 'forbidden');
+
+    // Delete attempt
+    const delRes = await handlers.DELETE(
+      createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111', 'DELETE', undefined, userBHeaders),
+      convParams,
+    );
+    assert.equal(delRes.status, 403);
+    const delBody = await delRes.json();
+    assert.equal(delBody.error.code, 'forbidden');
   });
 
-  it('creates a message and returns a mock assistant reply', async () => {
+  it('isolates conversation lists between different users', async () => {
+    const runtime = createMockRuntime();
+    const handlers = createConversationsCollectionHandlers(runtime);
+
+    // User A should see conversation
+    const userAListRes = await handlers.GET(
+      createMockRequest('http://localhost/api/conversations?page=1&pageSize=10', 'GET', undefined, {
+        'x-user-id': '22222222-2222-4222-8222-222222222222',
+      }),
+    );
+    assert.equal(userAListRes.status, 200);
+    const userABody = await userAListRes.json();
+    assert.equal(userABody.items.length, 1);
+
+    // User B should NOT see User A's conversation
+    const userBListRes = await handlers.GET(
+      createMockRequest('http://localhost/api/conversations?page=1&pageSize=10', 'GET', undefined, {
+        'x-user-id': '99999999-9999-4999-8999-999999999999',
+      }),
+    );
+    assert.equal(userBListRes.status, 200);
+    const userBBody = await userBListRes.json();
+    assert.equal(userBBody.items.length, 0);
+  });
+
+  it('creates a message, returns a mock assistant reply, and rejects cross-user message access (403 Forbidden)', async () => {
     const runtime = createMockRuntime();
     const handlers = createConversationMessagesHandlers(runtime);
+    const convParams = { params: Promise.resolve({ conversationId: '11111111-1111-4111-8111-111111111111' }) };
 
+    // User A sends message
     const response = await handlers.POST(
       createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111/messages', 'POST', { content: 'I need a follow-up reminder.' }),
-      { params: Promise.resolve({ conversationId: '11111111-1111-4111-8111-111111111111' }) },
+      convParams,
     );
 
     assert.equal(response.status, 200);
@@ -275,13 +347,29 @@ describe('conversation api handlers', () => {
     assert.equal(body.message.role, 'user');
     assert.equal(body.assistantMessage.role, 'assistant');
 
+    // User A reads message history
     const historyResponse = await handlers.GET(
       createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111/messages?page=1&pageSize=10', 'GET'),
-      { params: Promise.resolve({ conversationId: '11111111-1111-4111-8111-111111111111' }) },
+      convParams,
     );
 
     assert.equal(historyResponse.status, 200);
     const historyBody = await historyResponse.json();
     assert.equal(historyBody.items.length, 1);
+
+    // User B attempts to read User A's messages -> 403
+    const userBHeaders = { 'x-user-id': '99999999-9999-4999-8999-999999999999' };
+    const userBGetRes = await handlers.GET(
+      createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111/messages?page=1&pageSize=10', 'GET', undefined, userBHeaders),
+      convParams,
+    );
+    assert.equal(userBGetRes.status, 403);
+
+    // User B attempts to append message to User A's conversation -> 403
+    const userBPostRes = await handlers.POST(
+      createMockRequest('http://localhost/api/conversations/11111111-1111-4111-8111-111111111111/messages', 'POST', { content: 'Injected message' }, userBHeaders),
+      convParams,
+    );
+    assert.equal(userBPostRes.status, 403);
   });
 });
